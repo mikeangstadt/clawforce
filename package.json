@@ -1,0 +1,49 @@
+{
+  "name": "clawforce",
+  "version": "0.1.0",
+  "description": "Crowdsourced physical task orchestration engine \u2014 fan out tasks to human agents at scale, re-aggregate results",
+  "type": "module",
+  "bin": {
+    "clawforce": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "server": "tsx src/server.ts",
+    "mcp": "tsx src/mcp/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@doordash/sdk": "^0.6.13",
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "better-sqlite3": "^12.8.0",
+    "commander": "^13.1.0",
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.45.1",
+    "express": "^5.1.0",
+    "p-queue": "^8.1.0",
+    "pino": "^9.6.0",
+    "ulid": "^2.3.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.15.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}
