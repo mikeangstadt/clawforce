@@ -249,5 +249,66 @@ export function createCli(): Command {
       console.log(result.content[0].text);
     });
 
+  // --- compare ---
+  program
+    .command('compare')
+    .description('Compare cost estimates across all providers for a task type')
+    .requiredOption('-T, --type <type>', 'Task type (delivery, photo_capture, verification, errand, survey, custom)')
+    .requiredOption('--targets <file>', 'CSV or JSON file with target addresses')
+    .option('--template <file>', 'JSON file with task template')
+    .option('-w, --window <minutes>', 'Time window in minutes (e.g. 60 for a 1-hour ad flight)')
+    .action(async (opts) => {
+      let template: CampaignTemplate | undefined;
+      if (opts.template) {
+        template = JSON.parse(readFileSync(opts.template, 'utf-8'));
+      }
+      const targets = parseTargets(opts.targets);
+
+      console.log(`Comparing ${targets.length} ${opts.type} tasks across all providers...\n`);
+
+      const { handleCompareEstimates } = await import('../mcp/tools.js');
+      const result = await handleCompareEstimates({
+        type: opts.type,
+        targets,
+        template,
+        time_window_minutes: opts.window ? parseInt(opts.window) : undefined,
+      });
+
+      const data = JSON.parse(result.content[0].text);
+
+      // Pretty-print the comparison table
+      console.log(`Task type: ${data.task_type}`);
+      console.log(`Targets:   ${data.total_targets}\n`);
+
+      console.log('Provider          | Per Task         | Total              | Concurrency | Coverage              | Status');
+      console.log('------------------|------------------|--------------------|-------------|-----------------------|--------');
+
+      for (const p of data.providers) {
+        const perTask = 'cents' in p.per_task
+          ? `$${(p.per_task.cents / 100).toFixed(2)}`
+          : `$${(p.per_task.min_cents / 100).toFixed(2)} - $${(p.per_task.max_cents / 100).toFixed(2)}`;
+        const total = `$${(p.total.min_cents / 100).toLocaleString()} - $${(p.total.max_cents / 100).toLocaleString()}`;
+        const conc = `${p.dispatch_timing.max_concurrency} (${p.dispatch_timing.estimated_dispatch_minutes}m)`;
+        const coverage = p.coverage.excluded_regions
+          ? `${p.coverage.countries.join(',')} excl. ${p.coverage.excluded_regions.join(',')}`
+          : p.coverage.countries.join(',');
+        const status = p.implemented ? 'Ready' : 'Stub';
+
+        console.log(
+          `${p.provider.padEnd(18)}| ${perTask.padEnd(17)}| ${total.padEnd(19)}| ${conc.padEnd(12)}| ${coverage.padEnd(22)}| ${status}`
+        );
+      }
+
+      if (data.time_window) {
+        console.log(`\n=== TIME WINDOW: ${data.time_window.window_minutes} minutes ===`);
+        for (const rec of data.time_window.recommendations) {
+          console.log(`  → ${rec}`);
+        }
+      }
+
+      console.log(`\n=== RECOMMENDATION ===`);
+      console.log(`  ${data.recommendation.suggestion}`);
+    });
+
   return program;
 }

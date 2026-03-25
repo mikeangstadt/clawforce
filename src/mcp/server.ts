@@ -9,6 +9,7 @@ import {
   handleCancelCampaign,
   handleListCampaigns,
   handleEstimateCampaign,
+  handleCompareEstimates,
 } from './tools.js';
 import { startPoller } from '../engine/poller.js';
 import { logger } from '../util/logger.js';
@@ -67,6 +68,13 @@ export function createMcpServer(): McpServer {
     toolDefinitions.estimate_campaign.description,
     toolDefinitions.estimate_campaign.inputSchema,
     async (args) => handleEstimateCampaign(args as any),
+  );
+
+  server.tool(
+    'compare_estimates',
+    toolDefinitions.compare_estimates.description,
+    toolDefinitions.compare_estimates.inputSchema,
+    async (args) => handleCompareEstimates(args as any),
   );
 
   return server;

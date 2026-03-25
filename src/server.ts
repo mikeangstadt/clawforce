@@ -12,6 +12,7 @@ import {
   handleCancelCampaign,
   handleListCampaigns,
   handleEstimateCampaign,
+  handleCompareEstimates,
 } from './mcp/tools.js';
 
 initDb();
@@ -58,6 +59,11 @@ app.post('/api/campaigns/:id/cancel', async (req, res) => {
 
 app.post('/api/estimate', async (req, res) => {
   const result = await handleEstimateCampaign(req.body);
+  res.json(JSON.parse(result.content[0].text));
+});
+
+app.post('/api/compare', async (req, res) => {
+  const result = await handleCompareEstimates(req.body);
   res.json(JSON.parse(result.content[0].text));
 });
 
