@@ -168,22 +168,92 @@ clawforce campaign create \
 
 ## Install
 
+### Prerequisites
+
+- **Node.js 22+** — [install](https://nodejs.org/)
+- **pnpm** — `npm install -g pnpm` (or `corepack enable && corepack prepare pnpm@latest --activate`)
+
+That's it. No databases to install, no Redis, no Docker required. ClawForce uses SQLite — the database is a single file created automatically on first run.
+
+### Quick start
+
 ```bash
-# Clone it
+# Clone
 git clone https://github.com/mikeangstadt/clawforce.git
 cd clawforce
 
-# Install dependencies
+# Install
 pnpm install
 
-# Copy env template
+# Configure
 cp .env.example .env
+# Edit .env with your provider credentials (see below)
 
-# Run it
+# Verify it works
 pnpm dev --help
+pnpm dev providers
+
+# Run a test campaign with the mock provider (no credentials needed)
+pnpm dev campaign create \
+  --name "Test Campaign" \
+  --type photo_capture \
+  --provider mock \
+  --targets test/fixtures/sample-targets.csv \
+  --instructions "Take a photo of the location"
+
+# Check status
+pnpm dev campaign list
 ```
 
-### Global install (after build)
+### Configuration
+
+All settings via environment variables or `.env` file:
+
+```bash
+# Core (all optional — sensible defaults)
+CLAWFORCE_DB_PATH=./clawforce.db         # SQLite database location
+CLAWFORCE_PORT=3100                      # HTTP/REST server port
+CLAWFORCE_POLL_INTERVAL_MS=30000         # Status poll frequency (ms)
+CLAWFORCE_DEFAULT_CONCURRENCY=5          # Max parallel dispatches
+CLAWFORCE_LOG_LEVEL=info                 # debug, info, warn, error
+
+# DoorDash Drive API (get from https://developer.doordash.com)
+DOORDASH_DEVELOPER_ID=your-developer-id
+DOORDASH_KEY_ID=your-key-id
+DOORDASH_SIGNING_SECRET=your-signing-secret
+
+# TaskRabbit (when API access obtained)
+TASKRABBIT_API_KEY=
+TASKRABBIT_API_SECRET=
+
+# Uber Direct (when API access obtained)
+UBER_DIRECT_CLIENT_ID=
+UBER_DIRECT_CLIENT_SECRET=
+
+# Field Nation (when API access obtained)
+FIELD_NATION_API_KEY=
+```
+
+**No credentials?** No problem. The `mock` provider works with zero configuration — use it for development, testing, and demos.
+
+**DoorDash sandbox:** Sign up at [developer.doordash.com](https://developer.doordash.com), create API keys, and test with their sandbox environment for free before going live.
+
+### Running ClawForce
+
+There are four ways to run it, depending on your use case:
+
+#### 1. CLI (direct commands)
+
+```bash
+# During development (no build step)
+pnpm dev <command>
+
+# After building
+pnpm build
+node dist/index.js <command>
+```
+
+#### 2. Global CLI install
 
 ```bash
 pnpm build
@@ -192,11 +262,17 @@ pnpm link --global
 # Now available everywhere
 clawforce providers
 clawforce campaign create ...
+clawforce compare --type photo_capture --targets locations.csv --window 60
 ```
 
-### As an MCP server (for Claude, OpenClaw, etc.)
+#### 3. MCP server (for Claude Code, OpenClaw, etc.)
 
-Add to your MCP client config:
+```bash
+# Run standalone
+pnpm mcp
+```
+
+Or add to your MCP client config:
 
 ```json
 {
@@ -213,6 +289,24 @@ Add to your MCP client config:
 ```
 
 Now your AI agent has human minions. It can reason about what needs to happen in the physical world, compare providers and costs, dispatch thousands of people, and collect the results — all through tool calls. The AI plans. ClawForce executes. Humans deliver.
+
+#### 4. HTTP server (REST API)
+
+```bash
+pnpm server
+# ClawForce server running on http://localhost:3100
+# REST API: http://localhost:3100/api/
+# Health check: http://localhost:3100/health
+```
+
+Includes the status poller — active campaigns are automatically monitored for completion.
+
+### Run the tests
+
+```bash
+pnpm test           # Run once
+pnpm test:watch     # Watch mode
+```
 
 ---
 
