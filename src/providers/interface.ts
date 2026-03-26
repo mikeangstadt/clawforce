@@ -86,4 +86,7 @@ export interface TaskProvider {
 
   // Optional — only if provider supports 'quotes' feature
   estimateCost?(target: Target, template: CampaignTemplate): Promise<CostEstimate>;
+
+  // Optional — determine if a failed task should be automatically retried
+  shouldRetry?(providerData: unknown): { retry: boolean; reason: string };
 }

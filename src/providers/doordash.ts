@@ -30,9 +30,27 @@ const STATUS_MAP: Record<string, ProviderStatus['status']> = {
   returned: 'failed',
 };
 
+// Cancellation reasons that are retryable (not the customer/merchant's fault)
+const RETRYABLE_CANCELLATIONS = new Set([
+  'failed_to_assign_and_refunded', // No Dasher found — try again
+  'dasher_not_responding',         // Dasher went AFK
+  'dasher_cannot_fulfill_other',   // Dasher bailed — try again
+  'too_late',                      // Took too long — try again
+  'no_available_dashers',          // Supply issue — retry later
+]);
+
+// Non-retryable — something structurally wrong
+const NON_RETRYABLE_CANCELLATIONS = new Set([
+  'wrong_delivery_address',        // Bad address data
+  'cancelled_by_creator',          // We cancelled it
+  'fraudulent_order',              // Flagged
+  'store_closed',                  // Pickup location closed
+  'failed_to_process_payment',     // Payment issue
+]);
+
 export class DoorDashProvider implements TaskProvider {
   name = 'doordash';
-  private client: any; // DoorDashClient — lazy-loaded to avoid import issues without credentials
+  private client: any;
 
   capabilities: ProviderCapabilities = {
     taskTypes: ['delivery', 'photo_capture'],
@@ -60,26 +78,52 @@ export class DoorDashProvider implements TaskProvider {
   async dispatch(task: Task, template: CampaignTemplate): Promise<DispatchResult> {
     const client = await this.getClient();
     const target: Target = JSON.parse(task.target);
-    const externalDeliveryId = `cf_${task.campaignId}_${task.sequence}`;
+
+    // Support retry by appending attempt number to external ID
+    const attempt = (template._retryAttempt as number) || 0;
+    const externalDeliveryId = attempt > 0
+      ? `cf_${task.campaignId}_${task.sequence}_r${attempt}`
+      : `cf_${task.campaignId}_${task.sequence}`;
+
+    // Build optimized instructions for maximum Dasher success
+    const instructions = this.buildInstructions(template, target);
 
     const deliveryInput: Record<string, unknown> = {
       external_delivery_id: externalDeliveryId,
+
+      // Pickup — where the "package" comes from (can be minimal for photo tasks)
       pickup_address: template.pickupAddress,
-      pickup_business_name: template.pickupBusinessName || 'ClawForce',
+      pickup_business_name: template.pickupBusinessName || 'ClawForce Verification',
       pickup_phone_number: template.pickupPhoneNumber,
-      pickup_instructions: template.pickupInstructions || '',
+      pickup_instructions: template.pickupInstructions || 'No physical pickup needed. Proceed directly to the dropoff address.',
+      pickup_reference_tag: `CLAWFORCE-${task.sequence}`,
+
+      // Dropoff — the target location
       dropoff_address: target.address,
       dropoff_business_name: target.name || '',
       dropoff_phone_number: target.phone || template.dropoffPhoneNumber,
-      dropoff_instructions: template.dropoffInstructions || template.customInstructions || '',
+      dropoff_instructions: instructions,
+
+      // Force photo proof — this is the whole point
+      contactless_dropoff: true,
+      dropoff_options: {
+        proof_of_delivery: 'photo_required',
+      },
+
+      // Value and tip
       order_value: template.orderValue || 0,
+      tip: template.tip || 0,
+
+      // If something goes wrong, don't return — just dispose
+      action_if_undeliverable: 'dispose',
     };
 
-    if (template.tip) {
-      deliveryInput.tip = template.tip;
-    }
-
-    logger.info({ externalDeliveryId, address: target.address }, 'Dispatching DoorDash delivery');
+    logger.info({
+      externalDeliveryId,
+      address: target.address,
+      attempt: attempt + 1,
+      instructionLength: instructions.length,
+    }, 'Dispatching DoorDash delivery');
 
     const response = await client.createDelivery(deliveryInput);
 
@@ -111,8 +155,10 @@ export class DoorDashProvider implements TaskProvider {
   extractResult(providerData: unknown): ProviderResult {
     const data = providerData as Record<string, unknown>;
     const status = data.delivery_status as string;
-    const success = status === 'delivered';
+    const cancellationReason = data.cancellation_reason as string | undefined;
+    const cancellationMessage = data.cancellation_reason_message as string | undefined;
 
+    // Collect all available media
     const mediaUrls: string[] = [];
     if (data.dropoff_verification_image_url) {
       mediaUrls.push(data.dropoff_verification_image_url as string);
@@ -120,14 +166,91 @@ export class DoorDashProvider implements TaskProvider {
     if (data.pickup_verification_image_url) {
       mediaUrls.push(data.pickup_verification_image_url as string);
     }
+    if (data.dropoff_signature_image_url) {
+      mediaUrls.push(data.dropoff_signature_image_url as string);
+    }
+
+    const delivered = status === 'delivered';
+    const hasPhoto = mediaUrls.length > 0;
+
+    // Success = delivered AND we got a photo
+    const success = delivered && hasPhoto;
+
+    // Build verification data with all available context
+    const verificationData: Record<string, unknown> = {
+      delivery_status: status,
+      has_photo: hasPhoto,
+      photo_count: mediaUrls.length,
+    };
+
+    if (data.dasher_name) verificationData.dasher_name = data.dasher_name;
+    if (data.dasher_id) verificationData.dasher_id = data.dasher_id;
+    if (data.dropoff_time_actual) verificationData.dropoff_time = data.dropoff_time_actual;
+
+    // Track Dasher location at time of delivery for GPS verification
+    if (data.dasher_location) {
+      verificationData.dasher_location = data.dasher_location;
+    }
+
+    // Capture cancellation context for retry logic
+    if (cancellationReason) {
+      verificationData.cancellation_reason = cancellationReason;
+      verificationData.retryable = RETRYABLE_CANCELLATIONS.has(cancellationReason);
+    }
+    if (cancellationMessage) {
+      verificationData.cancellation_message = cancellationMessage;
+    }
+
+    // Edge case: delivered but no photo — partial success
+    if (delivered && !hasPhoto) {
+      verificationData.issue = 'delivered_no_photo';
+      verificationData.retryable = true;
+      logger.warn({ status, hasPhoto }, 'Delivery completed but no verification photo received');
+    }
 
     return {
       success,
       mediaUrls,
       feeCents: data.fee ? Math.round((data.fee as number) * 100) : undefined,
       trackingUrl: data.tracking_url as string | undefined,
+      verificationData,
       rawResponse: providerData,
     };
+  }
+
+  /**
+   * Determine if a failed task should be retried based on the failure reason.
+   */
+  shouldRetry(providerData: unknown): { retry: boolean; reason: string } {
+    const data = providerData as Record<string, unknown>;
+    const status = data.delivery_status as string;
+    const cancellationReason = data.cancellation_reason as string | undefined;
+
+    // Delivered but no photo — retry to get the photo
+    if (status === 'delivered') {
+      const hasPhoto = !!(data.dropoff_verification_image_url);
+      if (!hasPhoto) {
+        return { retry: true, reason: 'delivered_no_photo' };
+      }
+      return { retry: false, reason: 'success' };
+    }
+
+    // Cancelled with a retryable reason
+    if (cancellationReason && RETRYABLE_CANCELLATIONS.has(cancellationReason)) {
+      return { retry: true, reason: cancellationReason };
+    }
+
+    // Non-retryable cancellation
+    if (cancellationReason && NON_RETRYABLE_CANCELLATIONS.has(cancellationReason)) {
+      return { retry: false, reason: cancellationReason };
+    }
+
+    // Unknown cancellation — retry once to be safe
+    if (status === 'cancelled') {
+      return { retry: true, reason: 'unknown_cancellation' };
+    }
+
+    return { retry: false, reason: status };
   }
 
   validateTemplate(template: CampaignTemplate): ValidationResult {
@@ -161,5 +284,42 @@ export class DoorDashProvider implements TaskProvider {
         ? Math.round((new Date(response.estimated_pickup_time).getTime() - Date.now()) / 60000)
         : undefined,
     };
+  }
+
+  /**
+   * Build optimized dropoff instructions that maximize Dasher success rate.
+   * Limited to 512 chars by DoorDash, so every word counts.
+   */
+  private buildInstructions(template: CampaignTemplate, target: Target): string {
+    const parts: string[] = [];
+
+    // For photo_capture tasks, lead with what they're doing
+    if (template.customInstructions) {
+      parts.push(template.customInstructions);
+    }
+
+    if (template.dropoffInstructions) {
+      parts.push(template.dropoffInstructions);
+    }
+
+    // Add venue context if available
+    if (target.metadata?.venue_type) {
+      parts.push(`Venue type: ${target.metadata.venue_type}.`);
+    }
+
+    // Always end with photo requirement
+    parts.push('IMPORTANT: Take a clear photo as your proof of delivery.');
+
+    const instructions = parts.join(' ');
+
+    // DoorDash truncates at 512 chars — warn if we're close
+    if (instructions.length > 500) {
+      logger.warn({
+        length: instructions.length,
+        address: target.address,
+      }, 'Instructions approaching DoorDash 512 char limit');
+    }
+
+    return instructions.slice(0, 512);
   }
 }
