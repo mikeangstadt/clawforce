@@ -18,6 +18,8 @@
 
 ClawForce is a task orchestration engine that fans out physical-world operations to crowdsourced human agents at scale, then re-aggregates the results. Think Terraform, but instead of provisioning servers, you're provisioning *people*.
 
+Supports **DoorDash**, **Uber**, and **TaskRabbit** as out-of-the-box providers.
+
 It gives AI agents like [OpenClaw](https://github.com/openclaw/openclaw) something they've never had: **human minions.** Your AI reasons about what needs to happen in the physical world. ClawForce makes it happen. Thousands of hands, thousands of eyes, one API call.
 
 500 postcards to 500 doorsteps. 200 billboard photos for proof-of-play. 515 restaurant ad verifications during a 1-hour flight. 10,000 insurance property inspections overnight. One command.
