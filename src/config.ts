@@ -30,6 +30,8 @@ export interface Config {
   fieldNation: {
     clientId: string;
     clientSecret: string;
+    username: string;
+    password: string;
     baseUrl: string; // Sandbox or production
   };
 }
@@ -71,6 +73,8 @@ export const config: Config = {
   fieldNation: {
     clientId: env('FIELD_NATION_CLIENT_ID'),
     clientSecret: env('FIELD_NATION_CLIENT_SECRET'),
+    username: env('FIELD_NATION_USERNAME'),
+    password: env('FIELD_NATION_PASSWORD'),
     baseUrl: env('FIELD_NATION_BASE_URL', 'https://api-sandbox.fndev.net'),
   },
 };

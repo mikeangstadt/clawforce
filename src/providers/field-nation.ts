@@ -13,23 +13,24 @@ import type {
 import { config } from '../config.js';
 import { logger } from '../util/logger.js';
 
-const AUTH_PATH = '/authentication/oauth/token';
-
 // Field Nation work order statuses → normalized ClawForce statuses
 const STATUS_MAP: Record<string, ProviderStatus['status']> = {
   draft: 'pending',
   published: 'pending',
   routed: 'pending',
   assigned: 'assigned',
-  work_scheduled: 'assigned',
-  ready_to_go: 'assigned',
-  checked_in: 'in_progress',
-  on_my_way: 'in_progress',
+  confirmed: 'assigned',
+  at_risk: 'assigned',
+  provider_running_late: 'assigned',
+  provider_on_the_way: 'in_progress',
+  provider_checked_in: 'in_progress',
+  provider_checked_out: 'in_progress',
   work_done: 'in_progress', // Work done but not yet approved
   approved: 'completed',
   paid: 'completed',
-  closed: 'completed',
   cancelled: 'cancelled',
+  deleted: 'cancelled',
+  postponed: 'pending',
 };
 
 export class FieldNationProvider implements TaskProvider {
@@ -46,17 +47,24 @@ export class FieldNationProvider implements TaskProvider {
     estimatedCostRange: { minCents: 5000, maxCents: 20000 },
   };
 
+  /**
+   * Field Nation uses OAuth 2.0 password grant.
+   * Token is passed as a query parameter, not a Bearer header.
+   */
   private async authenticate(): Promise<string> {
-    if (this.accessToken && Date.now() < this.tokenExpiresAt - 300_000) {
+    if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) {
       return this.accessToken;
     }
 
-    const tokenUrl = `${config.fieldNation.baseUrl}${AUTH_PATH}`;
+    const tokenUrl = `${config.fieldNation.baseUrl}/api/rest/v2/oauth/token`;
 
+    // Field Nation requires form-data, not JSON
     const body = new URLSearchParams({
-      grant_type: 'client_credentials',
+      grant_type: 'password',
       client_id: config.fieldNation.clientId,
       client_secret: config.fieldNation.clientSecret,
+      username: config.fieldNation.username,
+      password: config.fieldNation.password,
     });
 
     const response = await fetch(tokenUrl, {
@@ -78,14 +86,17 @@ export class FieldNationProvider implements TaskProvider {
     return this.accessToken;
   }
 
+  /**
+   * Field Nation passes the token as a query parameter on every request.
+   */
   private async request(method: string, path: string, body?: unknown): Promise<any> {
     const token = await this.authenticate();
-    const url = `${config.fieldNation.baseUrl}/api/rest/v2${path}`;
+    const separator = path.includes('?') ? '&' : '?';
+    const url = `${config.fieldNation.baseUrl}/api/rest/v2${path}${separator}access_token=${token}`;
 
     const options: RequestInit = {
       method,
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
@@ -102,7 +113,6 @@ export class FieldNationProvider implements TaskProvider {
       throw new Error(`Field Nation API error (${response.status} ${method} ${path}): ${text}`);
     }
 
-    // Some endpoints return 204 No Content
     if (response.status === 204) return {};
 
     return response.json();
@@ -114,29 +124,35 @@ export class FieldNationProvider implements TaskProvider {
   private parseLocation(address: string): Record<string, unknown> {
     const parts = address.split(',').map(p => p.trim());
 
-    if (parts.length >= 3) {
-      const stateZipPart = parts.length >= 4 ? parts[parts.length - 2] : parts[parts.length - 1];
-      const stateZipMatch = stateZipPart.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-
-      if (stateZipMatch) {
-        return {
-          address1: parts[0],
-          address2: '',
-          city: parts.length >= 4 ? parts[parts.length - 3] : parts[1],
-          state: stateZipMatch[1],
-          zip: stateZipMatch[2],
-          country: 'US',
-        };
-      }
-    }
-
-    return {
+    let addr: Record<string, string> = {
       address1: address,
       address2: '',
       city: '',
       state: '',
       zip: '',
       country: 'US',
+    };
+
+    if (parts.length >= 3) {
+      const stateZipPart = parts.length >= 4 ? parts[parts.length - 2] : parts[parts.length - 1];
+      const stateZipMatch = stateZipPart.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+
+      if (stateZipMatch) {
+        addr = {
+          address1: parts[0],
+          address2: '',
+          city: parts.length >= 4 ? parts[parts.length - 3] : parts[1],
+          state: stateZipMatch[1],
+          zip: stateZipMatch[2],
+          country: parts.length >= 4 ? parts[parts.length - 1] : 'US',
+        };
+      }
+    }
+
+    return {
+      mode: 'custom',
+      ...addr,
+      type: { id: 1 }, // 1 = Commercial
     };
   }
 
@@ -148,14 +164,17 @@ export class FieldNationProvider implements TaskProvider {
       ? `cf_${task.campaignId}_${task.sequence}_r${attempt}`
       : `cf_${task.campaignId}_${task.sequence}`;
 
-    // Build work order title and description
     const title = template.customInstructions?.slice(0, 100) || 'ClawForce Task';
-    const description = [
+
+    // Field Nation uses HTML for descriptions
+    const descriptionParts = [
       template.customInstructions,
       template.dropoffInstructions,
-      `\n\nTarget: ${target.name || ''} @ ${target.address}`,
-      target.phone ? `Phone: ${target.phone}` : '',
-    ].filter(Boolean).join('\n');
+      `<br><br><b>Target:</b> ${target.name || ''} @ ${target.address}`,
+      target.phone ? `<br><b>Phone:</b> ${target.phone}` : '',
+      `<br><b>ClawForce ID:</b> ${externalId}`,
+    ].filter(Boolean);
+    const descriptionHtml = `<p>${descriptionParts.join(' ')}</p>`;
 
     // Schedule: default to next business day, 4-hour window
     const now = new Date();
@@ -163,33 +182,28 @@ export class FieldNationProvider implements TaskProvider {
     scheduleStart.setHours(9, 0, 0, 0);
     const scheduleEnd = new Date(scheduleStart.getTime() + 4 * 60 * 60 * 1000);
 
-    // Estimate pay based on task complexity
+    // Estimate pay
     const payCents = this.estimatePayCents(template);
 
-    const workOrder = {
+    const workOrder: Record<string, unknown> = {
       title,
-      description,
-      type_of_work: this.mapTaskType(template),
+      description: {
+        html: descriptionHtml,
+      },
       location: this.parseLocation(target.address),
       schedule: {
-        start: scheduleStart.toISOString(),
-        end: scheduleEnd.toISOString(),
-        type: 'exact',
+        service_window: {
+          mode: 'hours',
+          start: { utc: this.formatUtcDate(scheduleStart) },
+          end: { utc: this.formatUtcDate(scheduleEnd) },
+        },
       },
       pay: {
         type: 'fixed',
-        amount: payCents / 100, // Field Nation uses dollars
-      },
-      custom_fields: [
-        { name: 'clawforce_campaign_id', value: task.campaignId },
-        { name: 'clawforce_external_id', value: externalId },
-      ],
-      // Auto-publish so it goes to the marketplace immediately
-      status: 'published',
-      // Require photo uploads as deliverables
-      deliverables: {
-        required: true,
-        instructions: 'Upload all photos and documentation as attachments. Take clear, well-lit photos.',
+        base: {
+          amount: payCents / 100, // Field Nation uses dollars
+          units: 1,
+        },
       },
     };
 
@@ -198,21 +212,32 @@ export class FieldNationProvider implements TaskProvider {
       address: target.address,
       attempt: attempt + 1,
       payCents,
-    }, 'Dispatching Field Nation work order');
+    }, 'Creating Field Nation work order');
 
-    const response = await this.request('POST', '/work-orders', workOrder);
+    // Step 1: Create work order (creates in draft)
+    const response = await this.request('POST', '/workorders', workOrder);
+    const workOrderId = response.id;
+
+    // Step 2: Publish to marketplace so technicians can see and request it
+    try {
+      await this.request('POST', `/workorders/${workOrderId}/publish`);
+      logger.info({ workOrderId }, 'Field Nation work order published');
+    } catch (err) {
+      logger.warn({ workOrderId, error: (err as Error).message }, 'Failed to publish work order, left in draft');
+    }
 
     return {
-      providerId: String(response.id), // Field Nation work order ID
-      providerStatus: response.status?.name || 'published',
+      providerId: String(workOrderId),
+      providerStatus: 'published',
       providerData: response,
-      trackingUrl: response.id ? `https://app.fieldnation.com/workorders/${response.id}` : undefined,
+      trackingUrl: `https://app.fieldnation.com/workorders/${workOrderId}`,
     };
   }
 
   async getStatus(providerTaskId: string): Promise<ProviderStatus> {
-    const response = await this.request('GET', `/work-orders/${providerTaskId}`);
-    const rawStatus = response.status?.name || 'draft';
+    const response = await this.request('GET', `/workorders/${providerTaskId}`);
+    const statusObj = response.status as Record<string, any> | undefined;
+    const rawStatus = statusObj?.name?.toLowerCase().replace(/ /g, '_') || 'draft';
 
     return {
       status: STATUS_MAP[rawStatus] || 'in_progress',
@@ -221,35 +246,44 @@ export class FieldNationProvider implements TaskProvider {
     };
   }
 
+  /**
+   * Field Nation uses DELETE to cancel work orders.
+   */
   async cancel(providerTaskId: string): Promise<void> {
-    await this.request('POST', `/work-orders/${providerTaskId}/cancel`, {
-      reason: 'Cancelled by ClawForce',
+    await this.request('DELETE', `/workorders/${providerTaskId}`, {
+      cancel_reason: 'Cancelled by ClawForce',
+      notes: '',
+      message_to_provider: 'This task has been cancelled.',
     });
   }
 
   extractResult(providerData: unknown): ProviderResult {
     const data = providerData as Record<string, any>;
-    const rawStatus = data.status?.name as string || 'draft';
+    const statusObj = data.status as Record<string, any> | undefined;
+    const rawStatus = statusObj?.name?.toLowerCase().replace(/ /g, '_') || 'draft';
 
-    // Extract media from attachments/shipments
+    // Extract media from attachments
     const mediaUrls: string[] = [];
-    const attachments = data.attachments as Array<Record<string, any>> | undefined;
-    if (attachments) {
-      for (const att of attachments) {
-        if (att.url) mediaUrls.push(att.url);
-        if (att.thumbnail_url) mediaUrls.push(att.thumbnail_url);
+    const attachments = data.attachments as Record<string, any> | undefined;
+    if (attachments?.results) {
+      for (const folder of attachments.results as Array<Record<string, any>>) {
+        const files = folder.results || folder.files || [];
+        for (const file of files as Array<Record<string, any>>) {
+          if (file.file?.url) mediaUrls.push(file.file.url);
+          if (file.url) mediaUrls.push(file.url);
+        }
       }
     }
 
-    // Check custom deliverables too
-    const shipments = data.shipments as Array<Record<string, any>> | undefined;
-    if (shipments) {
-      for (const s of shipments) {
-        if (s.tracking_url) mediaUrls.push(s.tracking_url);
+    // Check for signatures
+    const signatures = data.signatures as Record<string, any> | undefined;
+    if (signatures?.results) {
+      for (const sig of signatures.results as Array<Record<string, any>>) {
+        if (sig.url) mediaUrls.push(sig.url);
       }
     }
 
-    const isComplete = ['approved', 'paid', 'closed'].includes(rawStatus);
+    const isComplete = ['approved', 'paid'].includes(rawStatus);
     const success = isComplete;
 
     const verificationData: Record<string, unknown> = {
@@ -261,31 +295,33 @@ export class FieldNationProvider implements TaskProvider {
     // Assignee info
     const assignee = data.assignee as Record<string, any> | undefined;
     if (assignee) {
-      if (assignee.first_name) verificationData.technician_name = `${assignee.first_name} ${assignee.last_name || ''}`.trim();
+      const name = [assignee.first_name, assignee.last_name].filter(Boolean).join(' ');
+      if (name) verificationData.technician_name = name;
       if (assignee.rating) verificationData.technician_rating = assignee.rating;
       if (assignee.phone) verificationData.technician_phone = assignee.phone;
     }
 
     // Time tracking
-    if (data.time_logs) {
-      const logs = data.time_logs as Array<Record<string, any>>;
-      const totalMinutes = logs.reduce((sum: number, log: Record<string, any>) => {
-        if (log.hours) return sum + (log.hours as number) * 60;
-        return sum;
-      }, 0);
+    const timeLogs = data.time_logs as Record<string, any> | undefined;
+    if (timeLogs?.results) {
+      const totalMinutes = (timeLogs.results as Array<Record<string, any>>).reduce(
+        (sum: number, log: Record<string, any>) => {
+          if (log.hours) return sum + (log.hours as number) * 60;
+          return sum;
+        }, 0);
       verificationData.total_time_minutes = totalMinutes;
     }
 
-    // Check-in/check-out times
-    if (data.check_in_time) verificationData.check_in_time = data.check_in_time;
-    if (data.check_out_time) verificationData.check_out_time = data.check_out_time;
+    // Closing notes
+    if (data.closing_notes) {
+      verificationData.closing_notes = data.closing_notes;
+    }
 
     // Cancellation context
-    if (rawStatus === 'cancelled') {
+    if (rawStatus === 'cancelled' || rawStatus === 'deleted') {
       verificationData.retryable = true;
     }
 
-    // Work done but not approved — still waiting
     if (rawStatus === 'work_done') {
       verificationData.awaiting_approval = true;
     }
@@ -293,7 +329,7 @@ export class FieldNationProvider implements TaskProvider {
     return {
       success,
       mediaUrls,
-      feeCents: data.pay?.amount != null ? Math.round((data.pay.amount as number) * 100) : undefined,
+      feeCents: data.pay?.base?.amount != null ? Math.round((data.pay.base.amount as number) * 100) : undefined,
       trackingUrl: data.id ? `https://app.fieldnation.com/workorders/${data.id}` : undefined,
       verificationData,
       rawResponse: providerData,
@@ -302,14 +338,20 @@ export class FieldNationProvider implements TaskProvider {
 
   shouldRetry(providerData: unknown): { retry: boolean; reason: string } {
     const data = providerData as Record<string, any>;
-    const rawStatus = data.status?.name as string || 'draft';
+    const statusObj = data.status as Record<string, any> | undefined;
+    const rawStatus = statusObj?.name?.toLowerCase().replace(/ /g, '_') || 'draft';
 
-    if (['approved', 'paid', 'closed'].includes(rawStatus)) {
+    if (['approved', 'paid'].includes(rawStatus)) {
       return { retry: false, reason: 'success' };
     }
 
-    if (rawStatus === 'cancelled') {
+    if (['cancelled', 'deleted'].includes(rawStatus)) {
       return { retry: true, reason: 'cancelled' };
+    }
+
+    // Provider removed themselves — retry to get a new one
+    if (rawStatus === 'provider_removed_assignment') {
+      return { retry: true, reason: 'provider_removed' };
     }
 
     return { retry: false, reason: rawStatus };
@@ -332,35 +374,30 @@ export class FieldNationProvider implements TaskProvider {
 
   /**
    * Estimate pay for a work order based on task complexity.
-   * Field Nation technicians expect fair market rates.
    */
   private estimatePayCents(template: CampaignTemplate): number {
     let baseCents = 7500; // $75 base for a standard task
 
     if (template.estimatedDurationMinutes) {
-      // ~$50/hr for skilled work
       baseCents = Math.round((template.estimatedDurationMinutes / 60) * 5000);
       baseCents = Math.max(baseCents, 5000); // $50 minimum
     }
 
     if (template.errandCategory === 'skilled_labor') {
-      baseCents = Math.round(baseCents * 1.3); // 30% premium for skilled labor
+      baseCents = Math.round(baseCents * 1.3);
     }
 
     if (template.multiStep || template.errandCategory === 'multi_step') {
-      baseCents = Math.round(baseCents * 1.5); // 50% premium for multi-step
+      baseCents = Math.round(baseCents * 1.5);
     }
 
     return baseCents;
   }
 
   /**
-   * Map ClawForce task type / errand category to a Field Nation work type string.
+   * Format a Date to Field Nation's expected UTC format: "YYYY-MM-DD HH:MM:SS"
    */
-  private mapTaskType(template: CampaignTemplate): string {
-    if (template.errandCategory === 'skilled_labor') return 'Installation & Setup';
-    if (template.errandCategory === 'inspection') return 'Site Survey';
-    if (template.errandCategory === 'multi_step') return 'Complex Task';
-    return 'Site Survey'; // Default — covers verification, photo_capture, etc.
+  private formatUtcDate(date: Date): string {
+    return date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
   }
 }

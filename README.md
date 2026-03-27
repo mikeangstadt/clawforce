@@ -291,6 +291,8 @@ UBER_DIRECT_CLIENT_SECRET=your-client-secret
 # Field Nation (requires contract — developer.fieldnation.com)
 FIELD_NATION_CLIENT_ID=your-client-id
 FIELD_NATION_CLIENT_SECRET=your-client-secret
+FIELD_NATION_USERNAME=your-username
+FIELD_NATION_PASSWORD=your-password
 FIELD_NATION_BASE_URL=https://api-sandbox.fndev.net
 ```
 
@@ -705,6 +707,8 @@ All via environment variables (or `.env` file):
 | `TASKRABBIT_BASE_URL` | `https://papi.sandbox.dolly.com` | Sandbox/production URL |
 | `FIELD_NATION_CLIENT_ID` | -- | Field Nation API credentials |
 | `FIELD_NATION_CLIENT_SECRET` | -- | |
+| `FIELD_NATION_USERNAME` | -- | Field Nation login username |
+| `FIELD_NATION_PASSWORD` | -- | Field Nation login password |
 | `FIELD_NATION_BASE_URL` | `https://api-sandbox.fndev.net` | Sandbox/production URL |
 
 ---
