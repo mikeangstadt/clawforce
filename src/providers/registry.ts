@@ -135,5 +135,5 @@ export function listProviders(taskType?: TaskType): ProviderSummary[] {
 
 function isStub(provider: TaskProvider): boolean {
   // Stubs throw with "not yet implemented" — check by attempting to detect stub providers
-  return ['taskrabbit', 'uber-direct', 'field-nation'].includes(provider.name);
+  return ['taskrabbit', 'field-nation'].includes(provider.name);
 }

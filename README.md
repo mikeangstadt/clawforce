@@ -278,9 +278,10 @@ DOORDASH_SIGNING_SECRET=your-signing-secret
 TASKRABBIT_API_KEY=
 TASKRABBIT_API_SECRET=
 
-# Uber Direct (when API access obtained)
-UBER_DIRECT_CLIENT_ID=
-UBER_DIRECT_CLIENT_SECRET=
+# Uber Direct (sign up at https://direct.uber.com)
+UBER_DIRECT_CUSTOMER_ID=your-customer-id
+UBER_DIRECT_CLIENT_ID=your-client-id
+UBER_DIRECT_CLIENT_SECRET=your-client-secret
 
 # Field Nation (when API access obtained)
 FIELD_NATION_API_KEY=
@@ -408,7 +409,7 @@ ClawForce doesn't care who does the work. Every gig platform is just a provider 
 | **mock** | everything | all | everywhere | $1-5 | Ready (dev/test) |
 | **doordash** | delivery, photo, errand | pickup_dropoff, food_delivery | US (excl. CA, NYC, SEA, CO) | $7.75-15 | Ready (Drive API) |
 | **taskrabbit** | photo, verification, errand, custom | shopping, wait_in_line, pickup_dropoff, inspection, food_delivery, personal_errand, multi_step, skilled_labor | US, UK, CA, FR, DE, ES | $20-80 | Stub |
-| **uber-direct** | delivery, errand | pickup_dropoff, food_delivery | US, CA, MX, BR, AU, JP, GB, FR, DE | $5-12 | Stub |
+| **uber-direct** | delivery, errand | pickup_dropoff, food_delivery | US, CA, MX, BR, AU, JP, GB, FR, DE | $5-12 | Ready (Direct API) |
 | **field-nation** | verification, survey, photo, errand, custom | inspection, skilled_labor, multi_step | US | $50-200 | Stub |
 
 *\*DoorDash photo capture works by dispatching a delivery with specific `dropoff_instructions` and collecting the verification photo. Creative? Yes. Does it work? Also yes.*
@@ -700,7 +701,7 @@ src/
     mock.ts         # Dev/test (simulates full lifecycle)
     doordash.ts     # DoorDash Drive API
     taskrabbit.ts   # Stub (ready for API access)
-    uber-direct.ts  # Stub
+    uber-direct.ts  # Uber Direct API
     field-nation.ts # Stub
   engine/           # Core orchestration
     fanout.ts       # Template x Targets -> dispatched tasks (p-queue)

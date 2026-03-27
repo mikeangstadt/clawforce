@@ -420,7 +420,7 @@ export async function handleCompareEstimates(args: {
 
     return {
       provider: provider.name,
-      implemented: !['taskrabbit', 'uber-direct', 'field-nation'].includes(provider.name),
+      implemented: !['taskrabbit', 'field-nation'].includes(provider.name),
       quote_source: quoteSource,
       per_task: avgFeeCents
         ? { cents: avgFeeCents, dollars: `$${(avgFeeCents / 100).toFixed(2)}` }

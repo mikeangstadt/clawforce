@@ -18,6 +18,7 @@ export interface Config {
     apiSecret: string;
   };
   uberDirect: {
+    customerId: string;
     clientId: string;
     clientSecret: string;
   };
@@ -51,6 +52,7 @@ export const config: Config = {
     apiSecret: env('TASKRABBIT_API_SECRET'),
   },
   uberDirect: {
+    customerId: env('UBER_DIRECT_CUSTOMER_ID'),
     clientId: env('UBER_DIRECT_CLIENT_ID'),
     clientSecret: env('UBER_DIRECT_CLIENT_SECRET'),
   },
