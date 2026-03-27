@@ -75,7 +75,7 @@ export const toolDefinitions = {
       type: z.enum(['delivery', 'photo_capture', 'verification', 'errand', 'survey', 'custom'])
         .describe('Task type'),
       provider: z.string().default('mock')
-        .describe('Provider name (doordash, taskrabbit, uber-direct, field-nation, mock) or "auto" for automatic selection'),
+        .describe('Provider name (doordash, taskrabbit, uber-direct, field-nation, favor, mock) or "auto" for automatic selection'),
       template: TemplateSchema.describe('Task template with pickup/dropoff details and instructions'),
       targets: z.array(TargetSchema).describe('Array of target locations/recipients'),
       config: ConfigSchema.describe('Fan-out configuration: concurrency, delay, dry run'),
@@ -420,7 +420,7 @@ export async function handleCompareEstimates(args: {
 
     return {
       provider: provider.name,
-      implemented: !['taskrabbit', 'uber-direct', 'field-nation'].includes(provider.name),
+      implemented: !['taskrabbit', 'uber-direct', 'field-nation', 'favor'].includes(provider.name),
       quote_source: quoteSource,
       per_task: avgFeeCents
         ? { cents: avgFeeCents, dollars: `$${(avgFeeCents / 100).toFixed(2)}` }

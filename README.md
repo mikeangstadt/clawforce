@@ -18,7 +18,7 @@
 
 ClawForce is a task orchestration engine that gives MCP-compatible AI agents autonomous human deployments for *anything* in the physical world. Think Terraform, but instead of provisioning servers, you're provisioning *people*.
 
-Ships with **DoorDash**, **Uber**, and **TaskRabbit** providers out of the box — but any gig platform, errand service, or freelance network is just one interface away.
+Ships with **DoorDash**, **Uber**, **TaskRabbit**, and **Favor** providers out of the box — but any gig platform, errand service, or freelance network is just one interface away.
 
 It gives AI agents like [OpenClaw](https://github.com/openclaw/openclaw) something they've never had: **human minions.** Your AI reasons about what needs to happen in the physical world. ClawForce makes it happen — from enterprise campaigns to personal errands. One API call.
 
@@ -284,6 +284,10 @@ UBER_DIRECT_CLIENT_SECRET=
 
 # Field Nation (when API access obtained)
 FIELD_NATION_API_KEY=
+
+# Favor (H-E-B) — Texas only (when API access obtained)
+FAVOR_API_KEY=
+FAVOR_API_SECRET=
 ```
 
 **No credentials?** No problem. The `mock` provider works with zero configuration — use it for development, testing, and demos.
@@ -410,6 +414,7 @@ ClawForce doesn't care who does the work. Every gig platform is just a provider 
 | **taskrabbit** | photo, verification, errand, custom | shopping, wait_in_line, pickup_dropoff, inspection, food_delivery, personal_errand, multi_step, skilled_labor | US, UK, CA, FR, DE, ES | $20-80 | Stub |
 | **uber-direct** | delivery, errand | pickup_dropoff, food_delivery | US, CA, MX, BR, AU, JP, GB, FR, DE | $5-12 | Stub |
 | **field-nation** | verification, survey, photo, errand, custom | inspection, skilled_labor, multi_step | US | $50-200 | Stub |
+| **favor** | delivery, errand, custom | shopping, wait_in_line, pickup_dropoff, food_delivery, personal_errand | TX (200+ cities) | $6-20 | Stub |
 
 *\*DoorDash photo capture works by dispatching a delivery with specific `dropoff_instructions` and collecting the verification photo. Creative? Yes. Does it work? Also yes.*
 
@@ -419,12 +424,12 @@ When you dispatch an errand with `--provider auto`, ClawForce routes based on th
 
 | Category | What it means | Best provider |
 |----------|--------------|---------------|
-| `shopping` | Buy something — requires judgment (quality, selection) | TaskRabbit |
-| `wait_in_line` | Wait at a location, purchase/collect, deliver | TaskRabbit |
-| `pickup_dropoff` | Pick up from A, deliver to B | DoorDash (cheapest), Uber, TaskRabbit |
-| `food_delivery` | Order/pick up food and deliver | DoorDash, Uber |
+| `shopping` | Buy something — requires judgment (quality, selection) | TaskRabbit, Favor |
+| `wait_in_line` | Wait at a location, purchase/collect, deliver | TaskRabbit, Favor |
+| `pickup_dropoff` | Pick up from A, deliver to B | DoorDash (cheapest), Uber, Favor, TaskRabbit |
+| `food_delivery` | Order/pick up food and deliver | DoorDash, Uber, Favor |
 | `inspection` | Go look at something and report back | TaskRabbit, Field Nation |
-| `personal_errand` | General personal tasks | TaskRabbit |
+| `personal_errand` | General personal tasks | TaskRabbit, Favor |
 | `multi_step` | 2+ stops or sequential steps | TaskRabbit, Field Nation |
 | `skilled_labor` | Assembly, installation, repair | TaskRabbit, Field Nation |
 
@@ -702,6 +707,7 @@ src/
     taskrabbit.ts   # Stub (ready for API access)
     uber-direct.ts  # Stub
     field-nation.ts # Stub
+    favor.ts        # Stub (Texas only, H-E-B owned)
   engine/           # Core orchestration
     fanout.ts       # Template x Targets -> dispatched tasks (p-queue)
     poller.ts       # Status polling loop
