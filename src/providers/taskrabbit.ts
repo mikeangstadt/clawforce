@@ -43,8 +43,8 @@ export class TaskRabbitProvider implements TaskProvider {
   private tokenExpiresAt = 0;
 
   capabilities: ProviderCapabilities = {
-    taskTypes: ['photo_capture', 'verification', 'errand', 'custom'],
-    errandCategories: ['shopping', 'wait_in_line', 'pickup_dropoff', 'inspection', 'food_delivery', 'personal_errand', 'multi_step', 'skilled_labor'],
+    taskTypes: ['delivery', 'errand'],
+    errandCategories: ['pickup_dropoff', 'food_delivery'],
     features: ['custom_instructions', 'scheduling', 'worker_rating'],
     coverage: { countries: ['US', 'GB', 'CA', 'FR', 'DE', 'ES'] },
     maxConcurrency: 10,

@@ -417,7 +417,7 @@ ClawForce doesn't care who does the work. Every gig platform is just a provider 
 |----------|-----------|-------------------|----------|-----------|--------|
 | **mock** | everything | all | everywhere | $1-5 | Ready (dev/test) |
 | **doordash** | delivery, photo, errand | pickup_dropoff, food_delivery | US (excl. CA, NYC, SEA, CO) | $7.75-15 | Ready (Drive API) |
-| **taskrabbit** | photo, verification, errand, custom | shopping, wait_in_line, pickup_dropoff, inspection, food_delivery, personal_errand, multi_step, skilled_labor | US, UK, CA, FR, DE, ES | $20-80 | Ready (Dolly API) |
+| **taskrabbit** | delivery, errand | pickup_dropoff, food_delivery | US, UK, CA, FR, DE, ES | $20-80 | Ready (Dolly API) |
 | **uber-direct** | delivery, errand | pickup_dropoff, food_delivery | US, CA, MX, BR, AU, JP, GB, FR, DE | $5-12 | Ready (Direct API) |
 | **field-nation** | verification, survey, photo, errand, custom | inspection, skilled_labor, multi_step | US | $50-200 | Ready (REST v2 API) |
 
