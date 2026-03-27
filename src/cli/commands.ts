@@ -8,6 +8,7 @@ import { aggregateResults } from '../engine/aggregator.js';
 import { startPoller, stopPoller } from '../engine/poller.js';
 import { listProviders, getProvider } from '../providers/registry.js';
 import { parseTargets } from '../util/csv.js';
+import { resolveCurrentLocation } from '../util/location.js';
 import type { CampaignTemplate, TaskType } from '../providers/interface.js';
 
 initDb();
@@ -39,7 +40,7 @@ export function createCli(): Command {
     .requiredOption('-n, --name <name>', 'Campaign name')
     .requiredOption('-T, --type <type>', 'Task type (delivery, photo_capture, verification, errand, survey, custom)')
     .option('-p, --provider <provider>', 'Provider name or "auto"', 'mock')
-    .requiredOption('--targets <file>', 'CSV or JSON file with target addresses')
+    .requiredOption('--targets <file>', 'CSV/JSON file, inline JSON, or "here" for current location')
     .option('--template <file>', 'JSON file with task template')
     .option('--pickup-address <address>', 'Pickup address (for deliveries)')
     .option('--pickup-phone <phone>', 'Pickup phone number')
@@ -70,9 +71,17 @@ export function createCli(): Command {
       if (opts.multiStep) template.multiStep = true;
       if (opts.returnTrip) template.returnTrip = true;
 
-      // Parse targets
-      const targets = parseTargets(opts.targets);
-      console.log(`Parsed ${targets.length} targets from ${opts.targets}`);
+      // Parse targets — "here" resolves to current device location
+      let targets;
+      if (opts.targets === 'here') {
+        console.log('Resolving current location...');
+        const loc = await resolveCurrentLocation();
+        targets = [{ address: loc.address, name: 'Current Location' }];
+        console.log(`Location: ${loc.address} (via ${loc.source})`);
+      } else {
+        targets = parseTargets(opts.targets);
+        console.log(`Parsed ${targets.length} targets from ${opts.targets}`);
+      }
 
       // Validate
       if (opts.provider !== 'auto' && opts.provider !== 'mock') {
@@ -242,7 +251,7 @@ export function createCli(): Command {
     .description('Estimate campaign cost')
     .requiredOption('-T, --type <type>', 'Task type')
     .requiredOption('-p, --provider <provider>', 'Provider name')
-    .requiredOption('--targets <file>', 'CSV or JSON file with target addresses')
+    .requiredOption('--targets <file>', 'CSV/JSON file, inline JSON, or "here" for current location')
     .option('--template <file>', 'JSON file with task template')
     .action(async (opts) => {
       let template: CampaignTemplate = {};
@@ -266,7 +275,7 @@ export function createCli(): Command {
     .command('compare')
     .description('Compare cost estimates across all providers for a task type')
     .requiredOption('-T, --type <type>', 'Task type (delivery, photo_capture, verification, errand, survey, custom)')
-    .requiredOption('--targets <file>', 'CSV or JSON file with target addresses')
+    .requiredOption('--targets <file>', 'CSV/JSON file, inline JSON, or "here" for current location')
     .option('--template <file>', 'JSON file with task template')
     .option('--errand-category <category>', 'Filter by errand category (shopping, wait_in_line, pickup_dropoff, etc.)')
     .option('-w, --window <minutes>', 'Time window in minutes (e.g. 60 for a 1-hour ad flight)')
