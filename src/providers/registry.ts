@@ -5,7 +5,6 @@ import { DoorDashProvider } from './doordash.js';
 import { TaskRabbitProvider } from './taskrabbit.js';
 import { UberDirectProvider } from './uber-direct.js';
 import { FieldNationProvider } from './field-nation.js';
-import { FavorProvider } from './favor.js';
 
 const providers = new Map<string, TaskProvider>();
 
@@ -19,7 +18,6 @@ function init(): void {
     new TaskRabbitProvider(),
     new UberDirectProvider(),
     new FieldNationProvider(),
-    new FavorProvider(),
   ];
 
   for (const provider of all) {
@@ -137,5 +135,5 @@ export function listProviders(taskType?: TaskType): ProviderSummary[] {
 
 function isStub(provider: TaskProvider): boolean {
   // Stubs throw with "not yet implemented" — check by attempting to detect stub providers
-  return ['taskrabbit', 'uber-direct', 'field-nation', 'favor'].includes(provider.name);
+  return ['taskrabbit', 'uber-direct', 'field-nation'].includes(provider.name);
 }
