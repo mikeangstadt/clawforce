@@ -135,5 +135,5 @@ export function listProviders(taskType?: TaskType): ProviderSummary[] {
 
 function isStub(provider: TaskProvider): boolean {
   // Stubs throw with "not yet implemented" — check by attempting to detect stub providers
-  return ['taskrabbit', 'field-nation'].includes(provider.name);
+  return false; // All providers are now implemented
 }

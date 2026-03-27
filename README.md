@@ -274,17 +274,24 @@ DOORDASH_DEVELOPER_ID=your-developer-id
 DOORDASH_KEY_ID=your-key-id
 DOORDASH_SIGNING_SECRET=your-signing-secret
 
-# TaskRabbit (when API access obtained)
-TASKRABBIT_API_KEY=
-TASKRABBIT_API_SECRET=
+# TaskRabbit / Dolly (request access at developer.taskrabbit.com)
+TASKRABBIT_AUTH0_DOMAIN=your-dolly-tenant.us.auth0.com
+TASKRABBIT_CLIENT_ID=your-client-id
+TASKRABBIT_CLIENT_SECRET=your-client-secret
+TASKRABBIT_AUDIENCE=your-audience
+TASKRABBIT_CLIENT_ENTITY_ID=clawforce
+TASKRABBIT_STORE_ID=clawforce-default
+TASKRABBIT_BASE_URL=https://papi.sandbox.dolly.com
 
 # Uber Direct (sign up at https://direct.uber.com)
 UBER_DIRECT_CUSTOMER_ID=your-customer-id
 UBER_DIRECT_CLIENT_ID=your-client-id
 UBER_DIRECT_CLIENT_SECRET=your-client-secret
 
-# Field Nation (when API access obtained)
-FIELD_NATION_API_KEY=
+# Field Nation (requires contract — developer.fieldnation.com)
+FIELD_NATION_CLIENT_ID=your-client-id
+FIELD_NATION_CLIENT_SECRET=your-client-secret
+FIELD_NATION_BASE_URL=https://api-sandbox.fndev.net
 ```
 
 **No credentials?** No problem. The `mock` provider works with zero configuration — use it for development, testing, and demos.
@@ -408,9 +415,9 @@ ClawForce doesn't care who does the work. Every gig platform is just a provider 
 |----------|-----------|-------------------|----------|-----------|--------|
 | **mock** | everything | all | everywhere | $1-5 | Ready (dev/test) |
 | **doordash** | delivery, photo, errand | pickup_dropoff, food_delivery | US (excl. CA, NYC, SEA, CO) | $7.75-15 | Ready (Drive API) |
-| **taskrabbit** | photo, verification, errand, custom | shopping, wait_in_line, pickup_dropoff, inspection, food_delivery, personal_errand, multi_step, skilled_labor | US, UK, CA, FR, DE, ES | $20-80 | Stub |
+| **taskrabbit** | photo, verification, errand, custom | shopping, wait_in_line, pickup_dropoff, inspection, food_delivery, personal_errand, multi_step, skilled_labor | US, UK, CA, FR, DE, ES | $20-80 | Ready (Dolly API) |
 | **uber-direct** | delivery, errand | pickup_dropoff, food_delivery | US, CA, MX, BR, AU, JP, GB, FR, DE | $5-12 | Ready (Direct API) |
-| **field-nation** | verification, survey, photo, errand, custom | inspection, skilled_labor, multi_step | US | $50-200 | Stub |
+| **field-nation** | verification, survey, photo, errand, custom | inspection, skilled_labor, multi_step | US | $50-200 | Ready (REST v2 API) |
 
 *\*DoorDash photo capture works by dispatching a delivery with specific `dropoff_instructions` and collecting the verification photo. Creative? Yes. Does it work? Also yes.*
 
@@ -688,6 +695,17 @@ All via environment variables (or `.env` file):
 | `DOORDASH_DEVELOPER_ID` | -- | DoorDash Drive API credentials |
 | `DOORDASH_KEY_ID` | -- | |
 | `DOORDASH_SIGNING_SECRET` | -- | |
+| `UBER_DIRECT_CUSTOMER_ID` | -- | Uber Direct API credentials |
+| `UBER_DIRECT_CLIENT_ID` | -- | |
+| `UBER_DIRECT_CLIENT_SECRET` | -- | |
+| `TASKRABBIT_AUTH0_DOMAIN` | -- | TaskRabbit/Dolly API credentials |
+| `TASKRABBIT_CLIENT_ID` | -- | |
+| `TASKRABBIT_CLIENT_SECRET` | -- | |
+| `TASKRABBIT_AUDIENCE` | -- | |
+| `TASKRABBIT_BASE_URL` | `https://papi.sandbox.dolly.com` | Sandbox/production URL |
+| `FIELD_NATION_CLIENT_ID` | -- | Field Nation API credentials |
+| `FIELD_NATION_CLIENT_SECRET` | -- | |
+| `FIELD_NATION_BASE_URL` | `https://api-sandbox.fndev.net` | Sandbox/production URL |
 
 ---
 
@@ -700,9 +718,9 @@ src/
     registry.ts     # Capability-based routing + auto-resolution + compare
     mock.ts         # Dev/test (simulates full lifecycle)
     doordash.ts     # DoorDash Drive API
-    taskrabbit.ts   # Stub (ready for API access)
+    taskrabbit.ts   # TaskRabbit/Dolly Delivery API
     uber-direct.ts  # Uber Direct API
-    field-nation.ts # Stub
+    field-nation.ts # Field Nation REST v2 API
   engine/           # Core orchestration
     fanout.ts       # Template x Targets -> dispatched tasks (p-queue)
     poller.ts       # Status polling loop

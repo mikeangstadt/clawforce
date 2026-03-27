@@ -14,8 +14,13 @@ export interface Config {
     signingSecret: string;
   };
   taskrabbit: {
-    apiKey: string;
-    apiSecret: string;
+    auth0Domain: string;
+    clientId: string;
+    clientSecret: string;
+    audience: string;
+    clientEntityId: string; // Your sub-entity ID for Dolly
+    storeId: string;        // Your default store/origin reference
+    baseUrl: string;        // Sandbox or production
   };
   uberDirect: {
     customerId: string;
@@ -23,7 +28,9 @@ export interface Config {
     clientSecret: string;
   };
   fieldNation: {
-    apiKey: string;
+    clientId: string;
+    clientSecret: string;
+    baseUrl: string; // Sandbox or production
   };
 }
 
@@ -48,8 +55,13 @@ export const config: Config = {
     signingSecret: env('DOORDASH_SIGNING_SECRET'),
   },
   taskrabbit: {
-    apiKey: env('TASKRABBIT_API_KEY'),
-    apiSecret: env('TASKRABBIT_API_SECRET'),
+    auth0Domain: env('TASKRABBIT_AUTH0_DOMAIN'),
+    clientId: env('TASKRABBIT_CLIENT_ID'),
+    clientSecret: env('TASKRABBIT_CLIENT_SECRET'),
+    audience: env('TASKRABBIT_AUDIENCE'),
+    clientEntityId: env('TASKRABBIT_CLIENT_ENTITY_ID', 'clawforce'),
+    storeId: env('TASKRABBIT_STORE_ID', 'clawforce-default'),
+    baseUrl: env('TASKRABBIT_BASE_URL', 'https://papi.sandbox.dolly.com'),
   },
   uberDirect: {
     customerId: env('UBER_DIRECT_CUSTOMER_ID'),
@@ -57,6 +69,8 @@ export const config: Config = {
     clientSecret: env('UBER_DIRECT_CLIENT_SECRET'),
   },
   fieldNation: {
-    apiKey: env('FIELD_NATION_API_KEY'),
+    clientId: env('FIELD_NATION_CLIENT_ID'),
+    clientSecret: env('FIELD_NATION_CLIENT_SECRET'),
+    baseUrl: env('FIELD_NATION_BASE_URL', 'https://api-sandbox.fndev.net'),
   },
 };
