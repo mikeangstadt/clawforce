@@ -9,55 +9,37 @@ export interface ResolvedLocation {
   state: string;
   zip: string;
   country: string;
-  source: 'corelocation' | 'ip_geolocation';
+  source: 'corelocation';
 }
 
 /**
- * Dynamically resolve the current device location.
- *
- * Strategy:
- * 1. Try CoreLocationCLI (precise GPS from macOS Location Services)
- * 2. Fall back to IP geolocation (city-level accuracy)
- *
- * Then reverse geocode coordinates to a street address.
+ * Resolve the current device location via GPS (CoreLocationCLI).
+ * No fallbacks — GPS or fail. We don't guess with IP geolocation.
  */
 export async function resolveCurrentLocation(): Promise<ResolvedLocation> {
-  // Strategy 1: CoreLocationCLI (precise)
-  const gps = tryCoreLcoation();
-  if (gps) {
-    const address = await reverseGeocode(gps.lat, gps.lng);
-    return {
-      latitude: gps.lat,
-      longitude: gps.lng,
-      ...address,
-      source: 'corelocation',
-    };
+  const gps = getCoreLocation();
+
+  if (!gps) {
+    throw new Error(
+      'Could not get GPS location. Ensure CoreLocationCLI is installed ' +
+      '(brew install corelocationcli) and Location Services are enabled ' +
+      'for CoreLocationCLI in System Settings > Privacy & Security > Location Services.'
+    );
   }
 
-  // Strategy 2: IP geolocation (approximate)
-  logger.info('CoreLocationCLI unavailable, falling back to IP geolocation');
-  const ipLoc = await ipGeolocation();
-  if (ipLoc) {
-    const address = await reverseGeocode(ipLoc.lat, ipLoc.lng);
-    return {
-      latitude: ipLoc.lat,
-      longitude: ipLoc.lng,
-      ...address,
-      source: 'ip_geolocation',
-    };
-  }
-
-  throw new Error(
-    'Could not determine current location. ' +
-    'Install CoreLocationCLI (brew install corelocationcli) and enable Location Services, ' +
-    'or ensure internet access for IP geolocation.'
-  );
+  const address = await reverseGeocode(gps.lat, gps.lng);
+  return {
+    latitude: gps.lat,
+    longitude: gps.lng,
+    ...address,
+    source: 'corelocation',
+  };
 }
 
 /**
- * Try to get precise GPS coordinates via CoreLocationCLI.
+ * Get precise GPS coordinates via CoreLocationCLI.
  */
-function tryCoreLcoation(): { lat: number; lng: number } | null {
+function getCoreLocation(): { lat: number; lng: number } | null {
   try {
     const output = execSync('CoreLocationCLI -once -format "%latitude,%longitude" -timeout 5', {
       timeout: 10_000,
@@ -70,7 +52,7 @@ function tryCoreLcoation(): { lat: number; lng: number } | null {
       const lat = parseFloat(parts[0]);
       const lng = parseFloat(parts[1]);
       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-        logger.info({ lat, lng }, 'Got precise location from CoreLocationCLI');
+        logger.info({ lat, lng }, 'Got GPS location from CoreLocationCLI');
         return { lat, lng };
       }
     }
@@ -81,30 +63,8 @@ function tryCoreLcoation(): { lat: number; lng: number } | null {
 }
 
 /**
- * Fall back to IP-based geolocation.
- */
-async function ipGeolocation(): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const response = await fetch('https://ipinfo.io/json', { signal: AbortSignal.timeout(5000) });
-    if (!response.ok) return null;
-
-    const data = await response.json() as { loc?: string };
-    if (!data.loc) return null;
-
-    const [lat, lng] = data.loc.split(',').map(Number);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      logger.info({ lat, lng, source: 'ip' }, 'Got approximate location from IP geolocation');
-      return { lat, lng };
-    }
-  } catch {
-    // No internet or service unavailable
-  }
-  return null;
-}
-
-/**
  * Reverse geocode coordinates to a street address using Apple's geocoder
- * via a lightweight Swift script, falling back to a free API.
+ * via a lightweight Swift script, falling back to Nominatim.
  */
 async function reverseGeocode(lat: number, lng: number): Promise<{
   address: string;
