@@ -1,7 +1,7 @@
 {
   "name": "clawforce",
   "version": "0.1.0",
-  "description": "Crowdsourced physical task orchestration engine \u2014 fan out tasks to human agents at scale, re-aggregate results",
+  "description": "Crowdsourced physical task orchestration engine — fan out tasks to human agents at scale, re-aggregate results",
   "type": "module",
   "bin": {
     "clawforce": "./dist/index.js"
@@ -28,6 +28,7 @@
     "express": "^5.1.0",
     "p-queue": "^8.1.0",
     "pino": "^9.6.0",
+    "playwright": "^1.58.2",
     "ulid": "^2.3.0",
     "zod": "^3.25.0"
   },
