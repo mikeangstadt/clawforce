@@ -1,7 +1,13 @@
 import dotenv from 'dotenv';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config({ path: '.env' });
-dotenv.config({ path: 'local.env', override: true });
+// Resolve .env paths relative to project root (parent of src/)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const projectRoot = resolve(__dirname, '..');
+
+dotenv.config({ path: resolve(projectRoot, '.env') });
+dotenv.config({ path: resolve(projectRoot, 'local.env'), override: true });
 
 export interface Config {
   dbPath: string;
