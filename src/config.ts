@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ path: '.env' });
+dotenv.config({ path: 'local.env', override: true });
 
 export interface Config {
   dbPath: string;

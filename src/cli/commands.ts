@@ -44,6 +44,7 @@ export function createCli(): Command {
     .option('--template <file>', 'JSON file with task template')
     .option('--pickup-address <address>', 'Pickup address (for deliveries)')
     .option('--pickup-phone <phone>', 'Pickup phone number')
+    .option('--dropoff-phone <phone>', 'Dropoff/recipient phone number')
     .option('--instructions <text>', 'Custom instructions for agents')
     .option('--errand-category <category>', 'Errand category (shopping, wait_in_line, pickup_dropoff, inspection, food_delivery, personal_errand, multi_step, skilled_labor)')
     .option('--purchase-budget <cents>', 'Max spend in cents for shopping errands')
@@ -63,6 +64,7 @@ export function createCli(): Command {
       }
       if (opts.pickupAddress) template.pickupAddress = opts.pickupAddress;
       if (opts.pickupPhone) template.pickupPhoneNumber = opts.pickupPhone;
+      if (opts.dropoffPhone) template.dropoffPhoneNumber = opts.dropoffPhone;
       if (opts.instructions) template.customInstructions = opts.instructions;
       if (opts.errandCategory) template.errandCategory = opts.errandCategory;
       if (opts.purchaseBudget) template.purchaseBudgetCents = parseInt(opts.purchaseBudget);
@@ -76,7 +78,11 @@ export function createCli(): Command {
       if (opts.targets === 'here') {
         console.log('Resolving current location...');
         const loc = await resolveCurrentLocation();
-        targets = [{ address: loc.address, name: 'Current Location' }];
+        targets = [{ address: loc.address, name: 'Current Location', phone: template.dropoffPhoneNumber || '' }];
+        // Default dropoff phone to pickup phone if not set
+        if (!template.dropoffPhoneNumber && template.pickupPhoneNumber) {
+          template.dropoffPhoneNumber = template.pickupPhoneNumber;
+        }
         console.log(`Location: ${loc.address} (via ${loc.source})`);
       } else {
         targets = parseTargets(opts.targets);
