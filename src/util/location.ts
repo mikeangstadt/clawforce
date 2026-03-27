@@ -69,8 +69,9 @@ function getCoreLocation(): { lat: number; lng: number } | null {
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
 
-    const parts = output.split(',');
-    if (parts.length === 2) {
+    // CoreLocationCLI may output space-separated or comma-separated depending on version
+    const parts = output.split(/[,\s]+/).filter(Boolean);
+    if (parts.length >= 2) {
       const lat = parseFloat(parts[0]);
       const lng = parseFloat(parts[1]);
       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
