@@ -89,14 +89,25 @@ export class DoorDashProvider implements TaskProvider {
     // Build optimized instructions for maximum Dasher success
     const instructions = this.buildInstructions(template, target);
 
+    // Derive pickup business name from address or template
+    const pickupName = template.pickupBusinessName
+      || this.extractBusinessName(template.pickupAddress || '')
+      || 'Pickup';
+
+    // Build pickup instructions — lead with action so Dasher knows to ORDER
+    const pickupInstructions = template.pickupInstructions
+      || (template.customInstructions
+        ? `PLEASE ORDER AND PAY at ${pickupName}: ${template.customInstructions}`.slice(0, 512)
+        : 'Pick up the order.');
+
     const deliveryInput: Record<string, unknown> = {
       external_delivery_id: externalDeliveryId,
 
-      // Pickup — where the "package" comes from (can be minimal for photo tasks)
+      // Pickup — use the real business name so Dashers know where they're going
       pickup_address: template.pickupAddress,
-      pickup_business_name: template.pickupBusinessName || 'ClawForce Verification',
+      pickup_business_name: pickupName,
       pickup_phone_number: template.pickupPhoneNumber,
-      pickup_instructions: template.pickupInstructions || 'No physical pickup needed. Proceed directly to the dropoff address.',
+      pickup_instructions: pickupInstructions,
       pickup_reference_tag: `CLAWFORCE-${task.sequence}`,
 
       // Dropoff — the target location
@@ -111,9 +122,9 @@ export class DoorDashProvider implements TaskProvider {
         proof_of_delivery: 'photo_required',
       },
 
-      // Value and tip
+      // Value and tip — default $5 tip if not specified
       order_value: template.orderValue || 0,
-      tip: template.tip || 0,
+      tip: template.tip || 500,
 
       // If something goes wrong, don't return — just dispose
       action_if_undeliverable: 'dispose',
@@ -322,5 +333,16 @@ export class DoorDashProvider implements TaskProvider {
     }
 
     return instructions.slice(0, 512);
+  }
+
+  /**
+   * Extract a business name from an address string like "P. Terry's, 1501 S 1st St, Austin, TX".
+   */
+  private extractBusinessName(address: string): string | null {
+    const firstComma = address.indexOf(',');
+    if (firstComma === -1) return null;
+    const firstPart = address.slice(0, firstComma).trim();
+    if (/^\d/.test(firstPart)) return null;
+    return firstPart;
   }
 }

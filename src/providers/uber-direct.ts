@@ -146,12 +146,26 @@ export class UberDirectProvider implements TaskProvider {
     // Build dropoff notes (Uber max 280 chars)
     const notes = this.buildNotes(template, target);
 
+    // Derive pickup business name from address or template
+    const pickupName = template.pickupBusinessName
+      || this.extractBusinessName(template.pickupAddress || '')
+      || 'Pickup';
+
+    // Put order instructions in pickup notes so the driver sees them BEFORE arriving.
+    // Lead with ACTION — drivers assume food is pre-ordered unless told otherwise.
+    const pickupNotes = [
+      `PLEASE ORDER AND PAY at ${pickupName}:`,
+      template.customInstructions,
+      template.pickupInstructions,
+    ].filter(Boolean).join(' ').slice(0, 280);
+
     const deliveryReq: Record<string, unknown> = {
-      // Pickup
-      pickup_name: template.pickupBusinessName || 'ClawForce Pickup',
+      // Pickup — use the real business name so drivers know where they're going
+      pickup_name: pickupName,
+      pickup_business_name: pickupName,
       pickup_address: this.formatAddress(template.pickupAddress || ''),
       pickup_phone_number: template.pickupPhoneNumber || '',
-      pickup_notes: template.pickupInstructions?.slice(0, 280) || '',
+      pickup_notes: pickupNotes,
 
       // Dropoff
       dropoff_name: target.name || 'Dropoff',
@@ -168,16 +182,16 @@ export class UberDirectProvider implements TaskProvider {
       deliverable_action: 'deliverable_action_leave_at_door',
       undeliverable_action: 'return',
 
-      // Manifest
+      // Manifest — describe the actual order, not a generic label
       manifest_items: [{
-        name: template.customInstructions?.slice(0, 100) || 'ClawForce task item',
+        name: template.customInstructions?.slice(0, 100) || 'Delivery item',
         quantity: 1,
         size: 'small',
       }],
       manifest_total_value: template.orderValue || 0,
 
-      // Tip (in cents)
-      tip: template.tip || 0,
+      // Tip in cents — default $5 if not specified (drivers won't accept $0)
+      tip: template.tip || 500,
 
       // Our reference
       external_id: externalId,
@@ -366,5 +380,20 @@ export class UberDirectProvider implements TaskProvider {
     }
 
     return notes.slice(0, 280);
+  }
+
+  /**
+   * Extract a business name from an address string like "P. Terry's, 1501 S 1st St, Austin, TX".
+   * If the first part before the comma looks like a name (not a street number), use it.
+   */
+  private extractBusinessName(address: string): string | null {
+    const firstComma = address.indexOf(',');
+    if (firstComma === -1) return null;
+
+    const firstPart = address.slice(0, firstComma).trim();
+    // If it starts with a digit, it's a street address, not a business name
+    if (/^\d/.test(firstPart)) return null;
+
+    return firstPart;
   }
 }
