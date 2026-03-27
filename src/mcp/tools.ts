@@ -4,8 +4,8 @@ import { createCampaign, getCampaign, listCampaigns as listCampaignsDb } from '.
 import { getTask, getTasksByCampaign, updateTask } from '../models/task.js';
 import { fanout, type FanoutConfig } from '../engine/fanout.js';
 import { aggregateResults } from '../engine/aggregator.js';
-import { listProviders as listProvidersRegistry, getProvider, getProvidersForTaskType } from '../providers/registry.js';
-import type { CampaignTemplate, TaskType } from '../providers/interface.js';
+import { listProviders as listProvidersRegistry, getProvider, getProvidersForTaskType, getProvidersForErrand } from '../providers/registry.js';
+import type { CampaignTemplate, TaskType, ErrandCategory } from '../providers/interface.js';
 import type { Target } from '../util/csv.js';
 
 // Ensure DB is initialized
@@ -20,6 +20,11 @@ const TargetSchema = z.object({
   metadata: z.record(z.string()).optional(),
 });
 
+const ErrandCategorySchema = z.enum([
+  'shopping', 'wait_in_line', 'pickup_dropoff', 'inspection',
+  'food_delivery', 'personal_errand', 'multi_step', 'skilled_labor',
+]);
+
 const TemplateSchema = z.object({
   pickupAddress: z.string().optional(),
   pickupBusinessName: z.string().optional(),
@@ -30,6 +35,20 @@ const TemplateSchema = z.object({
   orderValue: z.number().optional(),
   tip: z.number().optional(),
   customInstructions: z.string().optional(),
+
+  // Errand-specific fields — used when type is 'errand' or 'custom'
+  errandCategory: ErrandCategorySchema.optional()
+    .describe('Category of errand — helps route to the best provider (e.g., "shopping" routes to TaskRabbit, "food_delivery" routes to DoorDash)'),
+  purchaseBudgetCents: z.number().optional()
+    .describe('Max spend in cents for shopping errands (agent pays and gets reimbursed)'),
+  estimatedDurationMinutes: z.number().optional()
+    .describe('Expected task duration in minutes (e.g., 180 for waiting in a long BBQ line)'),
+  requiresJudgment: z.boolean().optional()
+    .describe('Does the agent need to make quality decisions? (e.g., pick a straight 2x4, choose ripe fruit)'),
+  multiStep: z.boolean().optional()
+    .describe('Does this involve multiple locations or sequential steps?'),
+  returnTrip: z.boolean().optional()
+    .describe('Does the agent need to return to origin? (e.g., dry cleaning roundtrip)'),
 }).passthrough();
 
 const ConfigSchema = z.object({
@@ -356,7 +375,15 @@ export async function handleCompareEstimates(args: {
   const taskType = args.type as TaskType;
   const count = args.targets.length;
   const template = args.template || {};
-  const providers = getProvidersForTaskType(taskType);
+
+  // For errand/custom types with a category, filter to providers that support that category
+  const errandCategory = template.errandCategory as ErrandCategory | undefined;
+  let providers;
+  if ((taskType === 'errand' || taskType === 'custom') && errandCategory) {
+    providers = getProvidersForErrand(errandCategory);
+  } else {
+    providers = getProvidersForTaskType(taskType);
+  }
 
   const comparisons = await Promise.all(providers.map(async (provider) => {
     const caps = provider.capabilities;

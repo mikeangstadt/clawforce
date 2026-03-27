@@ -15,7 +15,8 @@ export class UberDirectProvider implements TaskProvider {
   name = 'uber-direct';
 
   capabilities: ProviderCapabilities = {
-    taskTypes: ['delivery'],
+    taskTypes: ['delivery', 'errand'],
+    errandCategories: ['pickup_dropoff', 'food_delivery'],
     features: ['real_time_tracking', 'verification_photo', 'quotes', 'webhooks'],
     coverage: { countries: ['US', 'CA', 'MX', 'BR', 'AU', 'JP', 'GB', 'FR', 'DE'] },
     maxConcurrency: 10,

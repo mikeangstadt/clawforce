@@ -44,6 +44,12 @@ export function createCli(): Command {
     .option('--pickup-address <address>', 'Pickup address (for deliveries)')
     .option('--pickup-phone <phone>', 'Pickup phone number')
     .option('--instructions <text>', 'Custom instructions for agents')
+    .option('--errand-category <category>', 'Errand category (shopping, wait_in_line, pickup_dropoff, inspection, food_delivery, personal_errand, multi_step, skilled_labor)')
+    .option('--purchase-budget <cents>', 'Max spend in cents for shopping errands')
+    .option('--estimated-duration <minutes>', 'Expected task duration in minutes')
+    .option('--requires-judgment', 'Agent needs to make quality decisions')
+    .option('--multi-step', 'Task involves multiple locations or sequential steps')
+    .option('--return-trip', 'Agent needs to return to origin (roundtrip)')
     .option('--concurrency <n>', 'Max concurrent dispatches', '5')
     .option('--delay <ms>', 'Delay between dispatches in ms', '200')
     .option('--dry-run', 'Create tasks without dispatching')
@@ -57,6 +63,12 @@ export function createCli(): Command {
       if (opts.pickupAddress) template.pickupAddress = opts.pickupAddress;
       if (opts.pickupPhone) template.pickupPhoneNumber = opts.pickupPhone;
       if (opts.instructions) template.customInstructions = opts.instructions;
+      if (opts.errandCategory) template.errandCategory = opts.errandCategory;
+      if (opts.purchaseBudget) template.purchaseBudgetCents = parseInt(opts.purchaseBudget);
+      if (opts.estimatedDuration) template.estimatedDurationMinutes = parseInt(opts.estimatedDuration);
+      if (opts.requiresJudgment) template.requiresJudgment = true;
+      if (opts.multiStep) template.multiStep = true;
+      if (opts.returnTrip) template.returnTrip = true;
 
       // Parse targets
       const targets = parseTargets(opts.targets);
@@ -256,6 +268,7 @@ export function createCli(): Command {
     .requiredOption('-T, --type <type>', 'Task type (delivery, photo_capture, verification, errand, survey, custom)')
     .requiredOption('--targets <file>', 'CSV or JSON file with target addresses')
     .option('--template <file>', 'JSON file with task template')
+    .option('--errand-category <category>', 'Filter by errand category (shopping, wait_in_line, pickup_dropoff, etc.)')
     .option('-w, --window <minutes>', 'Time window in minutes (e.g. 60 for a 1-hour ad flight)')
     .action(async (opts) => {
       let template: CampaignTemplate | undefined;

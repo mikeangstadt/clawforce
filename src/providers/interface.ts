@@ -4,6 +4,18 @@ import type { Target } from '../util/csv.js';
 // Task types that providers can support
 export type TaskType = 'delivery' | 'photo_capture' | 'verification' | 'errand' | 'survey' | 'custom';
 
+// Errand categories — what kinds of flexible real-world tasks a provider can handle.
+// Used by the routing engine to match open-ended errand requests to the right provider.
+export type ErrandCategory =
+  | 'shopping'        // Buy something from a store (requires judgment — pick a ripe avocado, a straight 2x4)
+  | 'wait_in_line'    // Wait at a location and purchase/collect something (Franklin's BBQ, DMV, etc.)
+  | 'pickup_dropoff'  // Pick up from A, deliver to B (dry cleaning, returns, packages)
+  | 'inspection'      // Go look at something and report back (property, vehicle, venue)
+  | 'food_delivery'   // Order/pick up food and deliver it
+  | 'personal_errand' // General personal tasks (drop off mail, water plants, let the dog out)
+  | 'multi_step'      // Complex tasks with 2+ stops or sequential steps
+  | 'skilled_labor';  // Tasks requiring trade skills (assembly, installation, repair)
+
 // Features a provider may offer
 export type ProviderFeature =
   | 'real_time_tracking'
@@ -22,6 +34,7 @@ export interface CoverageArea {
 
 export interface ProviderCapabilities {
   taskTypes: TaskType[];
+  errandCategories: ErrandCategory[]; // What kinds of errands this provider can handle
   features: ProviderFeature[];
   coverage: CoverageArea;
   maxConcurrency: number;
@@ -38,6 +51,15 @@ export interface CampaignTemplate {
   orderValue?: number;
   tip?: number;
   customInstructions?: string;
+
+  // Errand-specific fields — used when type is 'errand' or 'custom'
+  errandCategory?: ErrandCategory;       // Helps route to the right provider
+  purchaseBudgetCents?: number;           // Max spend for shopping errands (agent pays, gets reimbursed)
+  estimatedDurationMinutes?: number;      // Expected task duration (e.g., 180 for a BBQ line wait)
+  requiresJudgment?: boolean;            // Does the agent need to make quality decisions? (e.g., pick a straight 2x4)
+  multiStep?: boolean;                   // Does this involve multiple locations or sequential steps?
+  returnTrip?: boolean;                  // Does the agent need to come back (e.g., dry cleaning roundtrip)?
+
   [key: string]: unknown; // Provider-specific fields
 }
 

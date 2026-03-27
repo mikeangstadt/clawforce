@@ -1,4 +1,4 @@
-import type { TaskProvider, TaskType } from './interface.js';
+import type { TaskProvider, TaskType, ErrandCategory } from './interface.js';
 import type { Target } from '../util/csv.js';
 import { MockProvider } from './mock.js';
 import { DoorDashProvider } from './doordash.js';
@@ -45,19 +45,45 @@ export interface ProviderPrefs {
   preferCheapest?: boolean;
   preferFastest?: boolean;
   excludeProviders?: string[];
+  errandCategory?: ErrandCategory;
+}
+
+/**
+ * Get providers that support a specific errand category.
+ * Falls back to all errand/custom-capable providers if no category specified.
+ */
+export function getProvidersForErrand(category?: ErrandCategory): TaskProvider[] {
+  init();
+  const errandProviders = Array.from(providers.values()).filter(p =>
+    p.capabilities.taskTypes.includes('errand') || p.capabilities.taskTypes.includes('custom')
+  );
+
+  if (!category) return errandProviders;
+
+  return errandProviders.filter(p =>
+    p.capabilities.errandCategories.includes(category)
+  );
 }
 
 export function resolveProvider(type: TaskType, _target: Target, prefs?: ProviderPrefs): TaskProvider {
   init();
-  let candidates = getProvidersForTaskType(type)
-    .filter(p => p.name !== 'mock'); // Don't auto-resolve to mock
+  let candidates: TaskProvider[];
+
+  // For errand/custom types, use errand category routing if available
+  if ((type === 'errand' || type === 'custom') && prefs?.errandCategory) {
+    candidates = getProvidersForErrand(prefs.errandCategory)
+      .filter(p => p.name !== 'mock');
+  } else {
+    candidates = getProvidersForTaskType(type)
+      .filter(p => p.name !== 'mock');
+  }
 
   if (prefs?.excludeProviders) {
     candidates = candidates.filter(p => !prefs.excludeProviders!.includes(p.name));
   }
 
   if (candidates.length === 0) {
-    throw new Error(`No provider available for task type: ${type}`);
+    throw new Error(`No provider available for task type: ${type}${prefs?.errandCategory ? ` (category: ${prefs.errandCategory})` : ''}`);
   }
 
   if (prefs?.preferCheapest) {
@@ -66,12 +92,21 @@ export function resolveProvider(type: TaskType, _target: Target, prefs?: Provide
     );
   }
 
+  // For errands requiring judgment or multi-step, prefer providers with worker_rating
+  if (prefs?.errandCategory && ['shopping', 'wait_in_line', 'multi_step', 'skilled_labor'].includes(prefs.errandCategory)) {
+    const withRating = candidates.filter(p => p.capabilities.features.includes('worker_rating'));
+    if (withRating.length > 0) {
+      candidates = withRating;
+    }
+  }
+
   return candidates[0];
 }
 
 export interface ProviderSummary {
   name: string;
   taskTypes: TaskType[];
+  errandCategories: ErrandCategory[];
   features: string[];
   coverage: { countries: string[]; excludedRegions?: string[] };
   estimatedCostRange: { minCents: number; maxCents: number };
@@ -89,6 +124,7 @@ export function listProviders(taskType?: TaskType): ProviderSummary[] {
   return all.map(p => ({
     name: p.name,
     taskTypes: p.capabilities.taskTypes,
+    errandCategories: p.capabilities.errandCategories,
     features: p.capabilities.features,
     coverage: p.capabilities.coverage,
     estimatedCostRange: p.capabilities.estimatedCostRange,

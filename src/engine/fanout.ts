@@ -114,7 +114,10 @@ async function dispatchSingleTask(
   let provider: TaskProvider;
 
   if (campaign.provider === 'auto') {
-    provider = resolveProvider(campaign.type as any, target);
+    provider = resolveProvider(campaign.type as any, target, {
+      errandCategory: template.errandCategory,
+      preferCheapest: true,
+    });
   } else {
     provider = getProvider(campaign.provider);
   }

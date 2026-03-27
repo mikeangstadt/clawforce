@@ -38,6 +38,7 @@ export class MockProvider implements TaskProvider {
 
   capabilities: ProviderCapabilities = {
     taskTypes: ['delivery', 'photo_capture', 'verification', 'errand', 'survey', 'custom'],
+    errandCategories: ['shopping', 'wait_in_line', 'pickup_dropoff', 'inspection', 'food_delivery', 'personal_errand', 'multi_step', 'skilled_labor'],
     features: ['real_time_tracking', 'verification_photo', 'custom_instructions', 'scheduling', 'quotes', 'webhooks', 'media_upload', 'worker_rating'],
     coverage: { countries: ['*'] },
     maxConcurrency: 50,

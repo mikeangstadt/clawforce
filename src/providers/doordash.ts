@@ -53,7 +53,8 @@ export class DoorDashProvider implements TaskProvider {
   private client: any;
 
   capabilities: ProviderCapabilities = {
-    taskTypes: ['delivery', 'photo_capture'],
+    taskTypes: ['delivery', 'photo_capture', 'errand'],
+    errandCategories: ['pickup_dropoff', 'food_delivery'],
     features: ['real_time_tracking', 'verification_photo', 'custom_instructions', 'quotes', 'webhooks'],
     coverage: {
       countries: ['US'],

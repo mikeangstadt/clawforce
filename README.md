@@ -16,13 +16,13 @@
 
 **Dispatch a mob. Collect the proof.**
 
-ClawForce is a task orchestration engine that fans out physical-world operations to crowdsourced human agents at scale, then re-aggregates the results. Think Terraform, but instead of provisioning servers, you're provisioning *people*.
+ClawForce is a task orchestration engine that gives MCP-compatible AI agents autonomous human deployments for *anything* in the physical world. Think Terraform, but instead of provisioning servers, you're provisioning *people*.
 
-Supports **DoorDash**, **Uber**, and **TaskRabbit** as out-of-the-box providers.
+Ships with **DoorDash**, **Uber**, and **TaskRabbit** providers out of the box — but any gig platform, errand service, or freelance network is just one interface away.
 
-It gives AI agents like [OpenClaw](https://github.com/openclaw/openclaw) something they've never had: **human minions.** Your AI reasons about what needs to happen in the physical world. ClawForce makes it happen. Thousands of hands, thousands of eyes, one API call.
+It gives AI agents like [OpenClaw](https://github.com/openclaw/openclaw) something they've never had: **human minions.** Your AI reasons about what needs to happen in the physical world. ClawForce makes it happen — from enterprise campaigns to personal errands. One API call.
 
-500 postcards to 500 doorsteps. 200 billboard photos for proof-of-play. 515 restaurant ad verifications during a 1-hour flight. 10,000 insurance property inspections overnight. One command.
+Pick out a straight 2x4 at Home Depot. Wait in line at Franklin's BBQ so you don't have to. Pick up and drop off your dry cleaning. Photograph 1,000 billboards. Knock 10,000 doors. Inspect 50,000 properties. If a human can do it, ClawForce can dispatch one — or ten thousand.
 
 ```
 clawforce campaign create \
@@ -40,6 +40,49 @@ clawforce campaign create \
 Every industry that dispatches humans to locations is paying for two things: **the person** and **the orchestration**. The person costs $8-80. The orchestration — the scheduling, the management layer, the QA, the reporting — costs 10x more. ClawForce makes the orchestration free. What's left is just the cost of a human showing up.
 
 The other unlock is **speed**. An insurance company can't inspect 10,000 properties in a day. A retail brand can't audit 5,000 shelves before Monday. An ad agency can't verify 500 billboard placements during a single flight. With ClawForce, all of these are one command, executed in parallel, results aggregated automatically.
+
+---
+
+## Everyday tasks your AI can now handle
+
+Your AI assistant doesn't have hands. ClawForce gives it hands.
+
+### Errands & Pickups
+
+```bash
+# "Hey Claude, I need a straight 2x4 from Home Depot — make sure it's not warped"
+clawforce campaign create \
+  --name "Lumber Pickup" \
+  --type custom \
+  --provider taskrabbit \
+  --targets '{"address": "Home Depot, 1200 N Lamar Blvd, Austin, TX"}' \
+  --instructions "Go to the lumber aisle. Pick out a single 8ft 2x4 — sight down the length to make sure it's straight, no warping, no splits. Purchase it. Deliver to drop-off address."
+```
+
+### Wait in Line
+
+```bash
+# "Get me Franklin's BBQ — I'm not waiting 3 hours"
+clawforce campaign create \
+  --name "Franklin's BBQ Pickup" \
+  --type custom \
+  --provider taskrabbit \
+  --targets '{"address": "Franklin Barbecue, 900 E 11th St, Austin, TX 78702"}' \
+  --instructions "Get in line. Order 1lb brisket, 1lb pulled pork, 1 pint of slaw. Pay with the card on file. Deliver to drop-off address. Keep it warm."
+```
+
+### Dry Cleaning, Returns, Drop-offs
+
+```bash
+clawforce campaign create \
+  --name "Dry Cleaning Roundtrip" \
+  --type custom \
+  --provider doordash \
+  --targets '{"address": "456 Elm St, Austin, TX"}' \
+  --instructions "Pick up 3 shirts and 1 suit from 456 Elm St (hanging on front door hook). Drop off at EcoClean Dry Cleaners, 789 Congress Ave. Request 2-day turnaround under name 'Angstadt'. Photograph the claim ticket."
+```
+
+If a human can do it, your AI can dispatch one. No custom integrations. No new apps. Just a tool call.
 
 ---
 
@@ -360,15 +403,52 @@ You (or your AI agent) define a campaign
 
 ClawForce doesn't care who does the work. Every gig platform is just a provider implementing one interface. The engine routes tasks to the cheapest capable provider automatically.
 
-| Provider | Task Types | Coverage | Cost/Task | Status |
-|----------|-----------|----------|-----------|--------|
-| **mock** | everything | everywhere | $1-5 | Ready (dev/test) |
-| **doordash** | delivery, photo* | US (excl. CA, NYC, SEA, CO) | $7.75-15 | Ready (Drive API) |
-| **taskrabbit** | photo, verification, errands, custom | US, UK, CA, FR, DE, ES | $20-80 | Stub |
-| **uber-direct** | delivery | US, CA, MX, BR, AU, JP, GB, FR, DE | $5-12 | Stub |
-| **field-nation** | verification, survey, photo, custom | US | $50-200 | Stub |
+| Provider | Task Types | Errand Categories | Coverage | Cost/Task | Status |
+|----------|-----------|-------------------|----------|-----------|--------|
+| **mock** | everything | all | everywhere | $1-5 | Ready (dev/test) |
+| **doordash** | delivery, photo, errand | pickup_dropoff, food_delivery | US (excl. CA, NYC, SEA, CO) | $7.75-15 | Ready (Drive API) |
+| **taskrabbit** | photo, verification, errand, custom | shopping, wait_in_line, pickup_dropoff, inspection, food_delivery, personal_errand, multi_step, skilled_labor | US, UK, CA, FR, DE, ES | $20-80 | Stub |
+| **uber-direct** | delivery, errand | pickup_dropoff, food_delivery | US, CA, MX, BR, AU, JP, GB, FR, DE | $5-12 | Stub |
+| **field-nation** | verification, survey, photo, errand, custom | inspection, skilled_labor, multi_step | US | $50-200 | Stub |
 
 *\*DoorDash photo capture works by dispatching a delivery with specific `dropoff_instructions` and collecting the verification photo. Creative? Yes. Does it work? Also yes.*
+
+### Errand category routing
+
+When you dispatch an errand with `--provider auto`, ClawForce routes based on the errand category — not just the task type. Need someone to pick out a straight 2x4? That's `shopping` → TaskRabbit. Need a food pickup delivered? That's `food_delivery` → DoorDash (cheapest). Need furniture assembled? That's `skilled_labor` → TaskRabbit or Field Nation.
+
+| Category | What it means | Best provider |
+|----------|--------------|---------------|
+| `shopping` | Buy something — requires judgment (quality, selection) | TaskRabbit |
+| `wait_in_line` | Wait at a location, purchase/collect, deliver | TaskRabbit |
+| `pickup_dropoff` | Pick up from A, deliver to B | DoorDash (cheapest), Uber, TaskRabbit |
+| `food_delivery` | Order/pick up food and deliver | DoorDash, Uber |
+| `inspection` | Go look at something and report back | TaskRabbit, Field Nation |
+| `personal_errand` | General personal tasks | TaskRabbit |
+| `multi_step` | 2+ stops or sequential steps | TaskRabbit, Field Nation |
+| `skilled_labor` | Assembly, installation, repair | TaskRabbit, Field Nation |
+
+```bash
+# Auto-routes to TaskRabbit (shopping requires judgment + worker_rating)
+clawforce campaign create \
+  --name "Lumber Run" \
+  --type errand \
+  --provider auto \
+  --errand-category shopping \
+  --purchase-budget 2000 \
+  --requires-judgment \
+  --targets '{"address": "Home Depot, Austin TX"}' \
+  --instructions "Buy one 8ft 2x4. Sight down the length — no warping, no splits."
+
+# Auto-routes to DoorDash (food_delivery, cheapest)
+clawforce campaign create \
+  --name "Lunch Pickup" \
+  --type errand \
+  --provider auto \
+  --errand-category food_delivery \
+  --targets '{"address": "Chick-fil-A, 1234 Main St"}' \
+  --instructions "Order a #1 combo with lemonade. Deliver to drop-off address."
+```
 
 ### Compare providers before you commit
 

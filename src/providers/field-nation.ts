@@ -15,7 +15,8 @@ export class FieldNationProvider implements TaskProvider {
   name = 'field-nation';
 
   capabilities: ProviderCapabilities = {
-    taskTypes: ['verification', 'survey', 'photo_capture', 'custom'],
+    taskTypes: ['verification', 'survey', 'photo_capture', 'errand', 'custom'],
+    errandCategories: ['inspection', 'skilled_labor', 'multi_step'],
     features: ['custom_instructions', 'scheduling', 'worker_rating', 'media_upload'],
     coverage: { countries: ['US'] },
     maxConcurrency: 20,
