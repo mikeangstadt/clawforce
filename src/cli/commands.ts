@@ -8,7 +8,7 @@ import { aggregateResults } from '../engine/aggregator.js';
 import { startPoller, stopPoller } from '../engine/poller.js';
 import { listProviders, getProvider } from '../providers/registry.js';
 import { parseTargets } from '../util/csv.js';
-import { resolveCurrentLocation } from '../util/location.js';
+import { resolveCurrentLocation, getDeviceOwnerName } from '../util/location.js';
 import type { CampaignTemplate, TaskType } from '../providers/interface.js';
 
 initDb();
@@ -78,7 +78,8 @@ export function createCli(): Command {
       if (opts.targets === 'here') {
         console.log('Resolving current location...');
         const loc = await resolveCurrentLocation();
-        targets = [{ address: loc.address, name: 'Current Location', phone: template.dropoffPhoneNumber || '' }];
+        const ownerName = `${getDeviceOwnerName()} (via ClawForce)`;
+        targets = [{ address: loc.address, name: ownerName, phone: template.dropoffPhoneNumber || '' }];
         // Default dropoff phone to pickup phone if not set
         if (!template.dropoffPhoneNumber && template.pickupPhoneNumber) {
           template.dropoffPhoneNumber = template.pickupPhoneNumber;

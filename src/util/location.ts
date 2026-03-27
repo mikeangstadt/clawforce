@@ -1,5 +1,27 @@
 import { execSync } from 'child_process';
+import { userInfo } from 'os';
 import { logger } from './logger.js';
+
+/**
+ * Get the device owner's real name from the OS.
+ * macOS: reads from Directory Services (the name shown in System Settings).
+ * Falls back to OS username.
+ */
+export function getDeviceOwnerName(): string {
+  try {
+    const output = execSync(
+      `dscl . -read /Users/${userInfo().username} RealName`,
+      { timeout: 3000, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
+    // Output is "RealName:\n First Last" — grab the last line
+    const lines = output.split('\n');
+    const name = lines[lines.length - 1].trim();
+    if (name && name !== 'RealName:') return name;
+  } catch {
+    // Not macOS or dscl unavailable
+  }
+  return userInfo().username;
+}
 
 export interface ResolvedLocation {
   latitude: number;

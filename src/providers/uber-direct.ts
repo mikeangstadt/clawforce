@@ -154,7 +154,7 @@ export class UberDirectProvider implements TaskProvider {
       pickup_notes: template.pickupInstructions?.slice(0, 280) || '',
 
       // Dropoff
-      dropoff_name: target.name || 'ClawForce Dropoff',
+      dropoff_name: target.name || 'Dropoff',
       dropoff_address: this.formatAddress(target.address),
       dropoff_phone_number: target.phone || template.dropoffPhoneNumber || '',
       dropoff_notes: notes,

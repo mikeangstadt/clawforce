@@ -6,7 +6,7 @@ import { fanout, type FanoutConfig } from '../engine/fanout.js';
 import { aggregateResults } from '../engine/aggregator.js';
 import { listProviders as listProvidersRegistry, getProvider, getProvidersForTaskType, getProvidersForErrand } from '../providers/registry.js';
 import type { CampaignTemplate, TaskType, ErrandCategory } from '../providers/interface.js';
-import { resolveCurrentLocation } from '../util/location.js';
+import { resolveCurrentLocation, getDeviceOwnerName } from '../util/location.js';
 import type { Target } from '../util/csv.js';
 
 // Ensure DB is initialized
@@ -153,7 +153,8 @@ export async function handleCreateCampaign(args: {
   // Resolve "here" targets to current device location
   if (args.targets.length === 1 && args.targets[0].address === 'here') {
     const loc = await resolveCurrentLocation();
-    args.targets = [{ address: loc.address, name: 'Current Location' }];
+    const ownerName = `${getDeviceOwnerName()} (via ClawForce)`;
+    args.targets = [{ address: loc.address, name: ownerName }];
   }
 
   // Validate provider supports this task type (unless auto)
